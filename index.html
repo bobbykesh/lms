@@ -3,233 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RapidEx LMS</title>
+    <title>RapidEx Secure LMS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Loading Spinner */
+        #loadingOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display:flex; justify-content:center; align-items:center; }
+    </style>
 </head>
 <body class="bg-light">
 
-    <!-- NAVBAR -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
-        <div class="container">
-            <span class="navbar-brand fw-bold text-warning"><i class="fas fa-bolt"></i> RapidEx LMS</span>
-            <div class="d-flex align-items-center gap-2">
-                <span id="connectionStatus" class="badge bg-secondary">Connecting...</span>
-                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#calculatorModal">
-                    <i class="fas fa-calculator"></i>
-                </button>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mt-4">
-
-        <!-- DASHBOARD -->
-        <div class="row mb-4 g-3">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="opacity-75">Active Balance</h6>
-                        <h3 id="dashOutstanding">₦0.00</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="opacity-75">Net Profit</h6>
-                        <h3 id="dashNetProfit">₦0.00</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-danger text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="opacity-75">PAR (Risk > 30 Days)</h6>
-                        <h3 id="dashPAR">₦0.00</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-white text-dark h-100 shadow-sm border">
-                    <div class="card-body d-flex flex-column justify-content-between">
-                        <div>
-                            <h6 class="text-muted">Expenses</h6>
-                            <h3 id="dashExpenses" class="text-danger">₦0.00</h3>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#expenseModal">+ Add Expense</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TABS -->
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#loans">Loans</button></li>
-            <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#clients">Clients</button></li>
-            <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#expenses">Expenses</button></li>
-        </ul>
-
-        <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom shadow-sm">
-            <!-- LOANS -->
-            <div class="tab-pane fade show active" id="loans">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
-                    <h5>Active Loans</h5>
-                    <button class="btn btn-warning fw-bold" onclick="openNewLoanModal()">+ New Loan</button>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light"><tr><th>Client</th><th>Details</th><th>Total Due</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead>
-                        <tbody id="loanTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-            <!-- CLIENTS -->
-            <div class="tab-pane fade" id="clients">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
-                    <h5>Clients</h5>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">+ Add Client</button>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light"><tr><th>Name</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead>
-                        <tbody id="clientTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-            <!-- EXPENSES -->
-            <div class="tab-pane fade" id="expenses">
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead>
-                        <tbody id="expenseTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <!-- 1. LOADING SCREEN -->
+    <div id="loadingOverlay">
+        <div class="spinner-border text-success" role="status"></div>
     </div>
 
-    <!-- MODAL: NEW LOAN (Smart) -->
-    <div class="modal fade" id="newLoanModal">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-warning">
-                    <h5 id="loanModalTitle">New Loan</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Limit Info -->
-                    <div class="alert alert-light border d-flex justify-content-between align-items-center">
-                        <span>Limit: <strong id="dynamicLimitDisplay">...</strong></span>
-                        <span id="limitMessage" class="badge bg-secondary">Calculating...</span>
+    <!-- 2. LOGIN SECTION -->
+    <div id="loginSection" class="container d-none" style="height: 100vh;">
+        <div class="row h-100 justify-content-center align-items-center">
+            <div class="col-md-4">
+                <div class="card shadow-lg border-0 rounded-lg">
+                    <div class="card-header bg-success text-white text-center py-4">
+                        <h3 class="fw-bold mb-0"><i class="fas fa-shield-alt"></i> RapidEx Admin</h3>
                     </div>
-                    <!-- TopUp Alert -->
-                    <div id="topUpAlert" class="alert alert-info d-none">
-                        <strong>Restructuring:</strong> Previous Balance of <strong id="topUpOldBalance"></strong> will be rolled over.
+                    <div class="card-body p-4">
+                        <form id="loginForm">
+                            <div class="mb-3">
+                                <label>Email</label>
+                                <input type="email" id="loginEmail" class="form-control" placeholder="admin@rapidex.com" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Password</label>
+                                <input type="password" id="loginPass" class="form-control" placeholder="••••••" required>
+                            </div>
+                            <div id="loginError" class="text-danger small mb-3 d-none">Invalid credentials</div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold">SECURE LOGIN</button>
+                        </form>
                     </div>
-
-                    <div class="row">
-                        <div class="col-md-6 border-end">
-                            <form id="loanForm">
-                                <input type="hidden" id="isTopUp" value="false"><input type="hidden" id="oldLoanId" value=""><input type="hidden" id="calculatedLimit" value="0">
-                                
-                                <label>Client</label> <select class="form-select mb-2" id="loanClientSelect" onchange="calculateClientLimit()" required></select>
-                                <label>Amount (₦)</label> <input type="number" class="form-control mb-1" id="loanAmount" oninput="updatePreview()" required>
-                                <div id="amountFeedback" class="text-danger small d-none fw-bold mb-2">Exceeds Limit!</div>
-                                
-                                <div class="row g-2">
-                                    <div class="col-6"><label>Interest (%)</label><input type="number" class="form-control mb-2" id="loanRate" value="15" oninput="updatePreview()" required></div>
-                                    <div class="col-6"><label>Freq</label><select class="form-select mb-2" id="loanFreq" onchange="updatePreview()"><option value="Monthly">Monthly</option><option value="Weekly">Weekly</option></select></div>
-                                </div>
-                                <label>Duration (Count)</label><input type="number" class="form-control mb-1" id="loanTerm" value="1" oninput="updatePreview()" required>
-                                <div id="termFeedback" class="text-danger small d-none fw-bold mb-2"></div>
-                                <label>Date</label><input type="date" class="form-control mb-3" id="loanDate" onchange="updatePreview()" required>
-                                <button type="submit" id="btnIssueLoan" class="btn btn-warning w-100 fw-bold">Issue Loan</button>
-                            </form>
-                        </div>
-                        <div class="col-md-6 bg-light p-3">
-                            <h6 class="text-muted">Schedule</h6>
-                            <div style="max-height:250px; overflow-y:auto;"><table class="table table-sm small"><tbody id="previewBody"></tbody></table></div>
-                            <div class="border-top pt-2">Total Due: <strong class="text-success" id="previewTotal">₦0.00</strong></div>
-                        </div>
+                    <div class="card-footer text-center bg-white border-0 small text-muted">
+                        Authorized Personnel Only
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: ADD CLIENT -->
-    <div class="modal fade" id="addClientModal">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5>Add Client</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <form id="clientForm">
-                        <input type="text" class="form-control mb-2" id="clientName" placeholder="Name" required>
-                        <input type="tel" class="form-control mb-2" id="clientPhone" placeholder="Phone" required>
-                        <textarea class="form-control mb-2" id="clientAddress" placeholder="Address/ID Details"></textarea>
-                        <button class="btn btn-primary w-100">Save</button>
-                    </form>
+    <!-- 3. MAIN APP SECTION (Hidden by default) -->
+    <div id="appSection" class="d-none">
+        
+        <!-- NAVBAR -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+            <div class="container">
+                <span class="navbar-brand fw-bold text-warning"><i class="fas fa-bolt"></i> RapidEx LMS</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="userEmailDisplay" class="text-white small me-2 d-none d-md-inline opacity-75"></span>
+                    <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#calculatorModal"><i class="fas fa-calculator"></i></button>
+                    <button id="btnLogout" class="btn btn-danger btn-sm fw-bold">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- DASHBOARD -->
+            <div class="row mb-4 g-3">
+                <div class="col-md-3"><div class="card bg-primary text-white h-100 shadow-sm"><div class="card-body"><h6 class="opacity-75">Active Balance</h6><h3 id="dashOutstanding">₦0.00</h3></div></div></div>
+                <div class="col-md-3"><div class="card bg-success text-white h-100 shadow-sm"><div class="card-body"><h6 class="opacity-75">Net Profit</h6><h3 id="dashNetProfit">₦0.00</h3></div></div></div>
+                <div class="col-md-3"><div class="card bg-danger text-white h-100 shadow-sm"><div class="card-body"><h6 class="opacity-75">PAR (Risk > 30 Days)</h6><h3 id="dashPAR">₦0.00</h3></div></div></div>
+                <div class="col-md-3"><div class="card bg-white text-dark h-100 shadow-sm border"><div class="card-body d-flex flex-column justify-content-between"><div><h6 class="text-muted">Expenses</h6><h3 id="dashExpenses" class="text-danger">₦0.00</h3></div><button class="btn btn-sm btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#expenseModal">+ Add Expense</button></div></div></div>
+            </div>
+
+            <!-- TABS -->
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#loans">Loans</button></li>
+                <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#clients">Clients</button></li>
+                <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#expenses">Expenses</button></li>
+            </ul>
+
+            <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom shadow-sm">
+                <!-- LOANS TAB -->
+                <div class="tab-pane fade show active" id="loans">
+                    <div class="d-flex justify-content-between mb-3 align-items-center"><h5>Active Loans</h5><button class="btn btn-warning fw-bold" onclick="openNewLoanModal()">+ New Loan</button></div>
+                    <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>Client</th><th>Details</th><th>Total Due</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody id="loanTableBody"></tbody></table></div>
+                </div>
+                <!-- CLIENTS TAB -->
+                <div class="tab-pane fade" id="clients">
+                    <div class="d-flex justify-content-between mb-3 align-items-center"><h5>Clients</h5><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">+ Add Client</button></div>
+                    <div class="table-responsive"><table class="table table-hover"><thead class="table-light"><tr><th>Name</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead><tbody id="clientTableBody"></tbody></table></div>
+                </div>
+                <!-- EXPENSES TAB -->
+                <div class="tab-pane fade" id="expenses">
+                    <div class="table-responsive"><table class="table table-striped"><thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead><tbody id="expenseTableBody"></tbody></table></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: REPAYMENT -->
-    <div class="modal fade" id="repaymentModal">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5>Payment</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p>Balance: <strong id="payBalance"></strong></p>
-                    <input type="hidden" id="payLoanId">
-                    <input type="number" class="form-control mb-3" id="payAmount" placeholder="Amount (₦)">
-                    <button onclick="processRepayment()" class="btn btn-success w-100">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- ALL MODALS (Same as before) -->
+    <!-- New Loan Modal -->
+    <div class="modal fade" id="newLoanModal"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header bg-warning"><h5 id="loanModalTitle">New Loan</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="alert alert-light border d-flex justify-content-between align-items-center"><span>Limit: <strong id="dynamicLimitDisplay">...</strong></span><span id="limitMessage" class="badge bg-secondary">Calculating...</span></div><div id="topUpAlert" class="alert alert-info d-none"><strong>Restructuring:</strong> Previous Balance of <strong id="topUpOldBalance"></strong> will be rolled over.</div><div class="row"><div class="col-md-6 border-end"><form id="loanForm"><input type="hidden" id="isTopUp" value="false"><input type="hidden" id="oldLoanId" value=""><input type="hidden" id="calculatedLimit" value="0"><label>Client</label> <select class="form-select mb-2" id="loanClientSelect" onchange="calculateClientLimit()" required></select><label>Amount (₦)</label> <input type="number" class="form-control mb-1" id="loanAmount" oninput="updatePreview()" required><div id="amountFeedback" class="text-danger small d-none fw-bold mb-2">Exceeds Limit!</div><div class="row g-2"><div class="col-6"><label>Interest (%)</label><input type="number" class="form-control mb-2" id="loanRate" value="15" oninput="updatePreview()" required></div><div class="col-6"><label>Freq</label><select class="form-select mb-2" id="loanFreq" onchange="updatePreview()"><option value="Monthly">Monthly</option><option value="Weekly">Weekly</option></select></div></div><label>Duration (Count)</label><input type="number" class="form-control mb-1" id="loanTerm" value="1" oninput="updatePreview()" required><div id="termFeedback" class="text-danger small d-none fw-bold mb-2"></div><label>Date</label><input type="date" class="form-control mb-3" id="loanDate" onchange="updatePreview()" required><button type="submit" id="btnIssueLoan" class="btn btn-warning w-100 fw-bold">Issue Loan</button></form></div><div class="col-md-6 bg-light p-3"><h6 class="text-muted">Schedule</h6><div style="max-height:250px; overflow-y:auto;"><table class="table table-sm small"><tbody id="previewBody"></tbody></table></div><div class="border-top pt-2">Total Due: <strong class="text-success" id="previewTotal">₦0.00</strong></div></div></div></div></div></div></div>
+    <!-- Add Client Modal -->
+    <div class="modal fade" id="addClientModal"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5>Add Client</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="clientForm"><input type="text" class="form-control mb-2" id="clientName" placeholder="Name" required><input type="tel" class="form-control mb-2" id="clientPhone" placeholder="Phone" required><textarea class="form-control mb-2" id="clientAddress" placeholder="Address/ID Details"></textarea><button class="btn btn-primary w-100">Save</button></form></div></div></div></div>
+    <!-- Repayment Modal -->
+    <div class="modal fade" id="repaymentModal"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5>Payment</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>Balance: <strong id="payBalance"></strong></p><input type="hidden" id="payLoanId"><input type="number" class="form-control mb-3" id="payAmount" placeholder="Amount (₦)"><button onclick="processRepayment()" class="btn btn-success w-100">Confirm</button></div></div></div></div>
+    <!-- Expense Modal -->
+    <div class="modal fade" id="expenseModal"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5>Expense</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="expenseForm"><input type="date" class="form-control mb-2" id="expDate" required><select class="form-select mb-2" id="expCat"><option>Data/Airtime</option><option>Transport</option><option>Salary</option><option>Other</option></select><input type="number" class="form-control mb-2" id="expAmount" placeholder="Amount" required><input type="text" class="form-control mb-2" id="expNote" placeholder="Note"><button class="btn btn-danger w-100">Log Expense</button></form></div></div></div></div>
+    <!-- Calculator Modal -->
+    <div class="modal fade" id="calculatorModal"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header"><h5>Calc</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="number" id="calcP" class="form-control mb-2" placeholder="Principal"><input type="number" id="calcT" class="form-control mb-2" placeholder="Total Expected"><button class="btn btn-dark w-100 mb-2" onclick="runCalc()">Result</button><div id="calcRes" class="d-none">Profit: <span id="resProfit"></span> | Rate: <span id="resRate"></span></div></div></div></div></div>
 
-    <!-- MODAL: EXPENSE -->
-    <div class="modal fade" id="expenseModal">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5>Expense</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <form id="expenseForm">
-                        <input type="date" class="form-control mb-2" id="expDate" required>
-                        <select class="form-select mb-2" id="expCat"><option>Data/Airtime</option><option>Transport</option><option>Salary</option><option>Other</option></select>
-                        <input type="number" class="form-control mb-2" id="expAmount" placeholder="Amount" required>
-                        <input type="text" class="form-control mb-2" id="expNote" placeholder="Note">
-                        <button class="btn btn-danger w-100">Log Expense</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: CALCULATOR -->
-    <div class="modal fade" id="calculatorModal">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header"><h5>Calc</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <input type="number" id="calcP" class="form-control mb-2" placeholder="Principal">
-                    <input type="number" id="calcT" class="form-control mb-2" placeholder="Total Expected">
-                    <button class="btn btn-dark w-100 mb-2" onclick="runCalc()">Result</button>
-                    <div id="calcRes" class="d-none">Profit: <span id="resProfit"></span> | Rate: <span id="resRate"></span></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- FIREBASE & LOGIC -->
+    <!-- FIREBASE MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 
-        // YOUR SPECIFIC CONFIG
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyA_7lyIB_MNXqvJZUfscnTSRAH-LKfBPew",
             authDomain: "rapidex-lms.firebaseapp.com",
@@ -243,15 +131,41 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
 
-        // Make Firebase available globally for app.js
+        // EXPOSE TO GLOBAL
         window.db = db;
         window.dbRef = ref;
         window.dbSet = set;
         window.dbOnValue = onValue;
+        window.auth = auth;
+        window.signIn = signInWithEmailAndPassword;
+        window.logOut = signOut;
 
-        // Signal app.js to start
-        document.dispatchEvent(new Event('firebase-ready'));
+        // AUTH STATE OBSERVER (The Security Guard)
+        onAuthStateChanged(auth, (user) => {
+            const loading = document.getElementById('loadingOverlay');
+            const loginSection = document.getElementById('loginSection');
+            const appSection = document.getElementById('appSection');
+
+            if (user) {
+                // USER LOGGED IN
+                console.log("Logged in as:", user.email);
+                document.getElementById('userEmailDisplay').innerText = user.email;
+                
+                loginSection.classList.add('d-none');
+                appSection.classList.remove('d-none');
+                
+                // Initialize App Logic
+                document.dispatchEvent(new Event('auth-success')); 
+            } else {
+                // USER LOGGED OUT
+                console.log("No user.");
+                appSection.classList.add('d-none');
+                loginSection.classList.remove('d-none');
+            }
+            loading.classList.add('d-none');
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
