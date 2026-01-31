@@ -3,7 +3,7 @@ let clients = [];
 let loans = [];
 let expenses = [];
 
-const PENALTY_FEE = 1000;
+const PENALTY_FEE = 300;
 const MAX_LOAN_CAP = 100000;
 const BASE_LIMIT = 20000;
 
