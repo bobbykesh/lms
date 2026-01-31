@@ -1,257 +1,349 @@
-// --- DATABASE INITIALIZATION ---
-// We try to get data from LocalStorage first. If not found, use empty arrays.
-let clients = JSON.parse(localStorage.getItem('lm_clients')) || [];
-let loans = JSON.parse(localStorage.getItem('lm_loans')) || [];
+// --- VARIABLES & CONFIG ---
+let clients = [];
+let loans = [];
+let expenses = [];
 
-// --- EVENT LISTENERS ---
-document.addEventListener('DOMContentLoaded', () => {
-    renderClients();
-    renderLoans();
-    updateDashboard();
+const PENALTY_FEE = 1000;
+const MAX_LOAN_CAP = 100000;
+const BASE_LIMIT = 20000;
+
+const formatNaira = (amt) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amt);
+
+// --- FIREBASE CONNECTION ---
+document.addEventListener('firebase-ready', () => {
+    const statusBadge = document.getElementById('connectionStatus');
     
-    // Set default date picker to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('loanDate').value = today;
+    const dbRef = window.dbRef(window.db, '/');
+    window.dbOnValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (data) {
+            clients = data.clients || [];
+            loans = data.loans || [];
+            expenses = data.expenses || [];
+        } else {
+            // Empty DB
+            clients = []; loans = []; expenses = [];
+        }
+
+        // Update UI
+        statusBadge.className = 'badge bg-success';
+        statusBadge.innerText = 'Online';
+        renderAll();
+    }, (error) => {
+        statusBadge.className = 'badge bg-danger';
+        statusBadge.innerText = 'Error';
+        console.error("Firebase Error:", error);
+        alert("Database Permission Denied. Did you fix the Rules in Console?");
+    });
 });
 
-// --- 1. CLIENT MANAGEMENT ---
+function saveToCloud() {
+    document.getElementById('connectionStatus').innerText = 'Saving...';
+    window.dbSet(window.dbRef(window.db, '/'), {
+        clients: clients,
+        loans: loans,
+        expenses: expenses,
+        lastUpdated: new Date().toISOString()
+    }).then(() => {
+        document.getElementById('connectionStatus').innerText = 'Online';
+    });
+}
 
-// Add Client
+function renderAll() {
+    renderClients();
+    renderLoans();
+    renderExpenses();
+    updateDashboard();
+}
+
+// --- CLIENTS ---
 document.getElementById('clientForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const newClient = {
-        id: Date.now(), // Unique ID based on timestamp
+    clients.push({
+        id: Date.now(),
         name: document.getElementById('clientName').value,
         phone: document.getElementById('clientPhone').value,
-        address: document.getElementById('clientAddress').value
-    };
-    
-    clients.push(newClient);
-    saveToLocalStorage(); // Auto-save
-    renderClients();
-    updateDashboard();
-    
-    e.target.reset();
-    bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+        address: document.getElementById('clientAddress').value,
+        isBlacklisted: false
+    });
+    saveToCloud();
+    e.target.reset(); bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
 });
 
-// Render Client Table
-function renderClients() {
-    const tbody = document.getElementById('clientTableBody');
-    if(clients.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No clients yet. Add one!</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = clients.map(c => `
-        <tr>
-            <td class="text-muted"><small>#${c.id.toString().slice(-4)}</small></td>
-            <td class="fw-bold">${c.name}</td>
-            <td>${c.phone}</td>
-            <td>${c.address}</td>
-        </tr>
-    `).join('');
+function toggleBlacklist(id) {
+    const c = clients.find(x => x.id == id);
+    c.isBlacklisted = !c.isBlacklisted;
+    saveToCloud();
 }
 
-// --- 2. LOAN ORIGINATION ---
+// --- SMART LOAN LOGIC ---
+function calculateClientLimit() {
+    const clientId = document.getElementById('loanClientSelect').value;
+    const client = clients.find(c => c.id == clientId);
+    if(!client) return 0;
 
-// Populate the Dropdown in New Loan Modal
-function loadClientSelect() {
+    if (client.isBlacklisted) {
+        setLimitUI(0, "Blacklisted", "bg-danger");
+        return 0;
+    }
+
+    let limit = BASE_LIMIT; 
+    let msg = "Starter";
+    let bg = "bg-secondary";
+
+    // Check history
+    const pastLoans = loans.filter(l => l.clientId == clientId && l.status === 'Paid');
+    let badLoans = 0;
+    
+    // Check for penalties in history
+    pastLoans.forEach(l => {
+        // If loan had penalty (assuming we tracked it, for MVP we check simple balance logic or just count paid count)
+        // For simple MVP logic: Just count paid loans increases limit
+    });
+
+    // Add 20k per paid loan
+    if(pastLoans.length > 0) {
+        limit += (pastLoans.length * 20000);
+        msg = `Level ${pastLoans.length}`;
+        bg = "bg-success";
+    }
+
+    if (limit > MAX_LOAN_CAP) { limit = MAX_LOAN_CAP; msg = "MAX VIP"; }
+    
+    setLimitUI(limit, msg, bg);
+    return limit;
+}
+
+function setLimitUI(limit, msg, bg) {
+    document.getElementById('calculatedLimit').value = limit;
+    document.getElementById('dynamicLimitDisplay').innerText = formatNaira(limit);
+    const badge = document.getElementById('limitMessage');
+    badge.className = `badge ${bg}`;
+    badge.innerText = msg;
+}
+
+// Open Modal Logic
+window.openNewLoanModal = function(topUpId = null) {
+    document.getElementById('loanForm').reset();
     const select = document.getElementById('loanClientSelect');
-    if(clients.length === 0) {
-        select.innerHTML = '<option value="">No clients found. Add a client first.</option>';
+    select.innerHTML = clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    
+    document.getElementById('isTopUp').value = 'false';
+    document.getElementById('topUpAlert').classList.add('d-none');
+    document.getElementById('oldLoanId').value = '';
+    select.disabled = false;
+
+    if(topUpId) {
+        const l = loans.find(x => x.id == topUpId);
+        document.getElementById('isTopUp').value = 'true';
+        document.getElementById('topUpAlert').classList.remove('d-none');
+        document.getElementById('topUpOldBalance').innerText = formatNaira(l.balance);
+        document.getElementById('oldLoanId').value = topUpId;
+        select.value = l.clientId;
+        select.disabled = true;
+    }
+
+    calculateClientLimit();
+    updatePreview(); // Clear preview
+    new bootstrap.Modal(document.getElementById('newLoanModal')).show();
+};
+
+function updatePreview() {
+    const amt = parseFloat(document.getElementById('loanAmount').value) || 0;
+    const term = parseFloat(document.getElementById('loanTerm').value) || 0;
+    const rate = document.getElementById('loanRate').value;
+    const freq = document.getElementById('loanFreq').value;
+    const date = document.getElementById('loanDate').value;
+    const limit = parseFloat(document.getElementById('calculatedLimit').value);
+    const isTopUp = document.getElementById('isTopUp').value === 'true';
+    const oldId = document.getElementById('oldLoanId').value;
+
+    let exposure = amt;
+    if(isTopUp) {
+        const l = loans.find(x => x.id == oldId);
+        if(l) exposure += l.balance;
+    }
+
+    let isValid = true;
+    
+    // Check Limit
+    if(exposure > limit) {
+        document.getElementById('amountFeedback').classList.remove('d-none');
+        isValid = false;
     } else {
-        select.innerHTML = clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        document.getElementById('amountFeedback').classList.add('d-none');
+    }
+
+    // Check Tenure (Max 6 months)
+    let maxT = freq === 'Monthly' ? 6 : 26;
+    if(term > maxT) {
+        document.getElementById('termFeedback').innerText = `Max ${maxT} ${freq === 'Monthly' ? 'Months' : 'Weeks'}`;
+        document.getElementById('termFeedback').classList.remove('d-none');
+        isValid = false;
+    } else {
+        document.getElementById('termFeedback').classList.add('d-none');
+    }
+
+    document.getElementById('btnIssueLoan').disabled = !isValid;
+
+    if(amt && term && date && isValid) {
+        const { total, schedule } = calculateSchedule(amt, rate, term, freq, date);
+        document.getElementById('previewTotal').innerText = formatNaira(total);
+        document.getElementById('previewBody').innerHTML = schedule.map((s,i) => `<tr><td>${i+1}. ${s.date}</td><td>${formatNaira(s.amount)}</td></tr>`).join('');
+    } else {
+        document.getElementById('previewBody').innerHTML = '';
+        document.getElementById('previewTotal').innerText = '₦0.00';
     }
 }
 
-// Add Loan
+function calculateSchedule(amt, rate, term, freq, start) {
+    const p = parseFloat(amt);
+    const total = p + (p * (rate/100));
+    const inst = total / parseInt(term);
+    let s = [];
+    let d = new Date(start);
+    for(let i=0; i<term; i++) {
+        if(freq==='Daily') d.setDate(d.getDate()+1);
+        else if(freq==='Weekly') d.setDate(d.getDate()+7);
+        else d.setMonth(d.getMonth()+1);
+        s.push({ date: d.toISOString().split('T')[0], amount: inst, paid: false });
+    }
+    return { total, schedule: s };
+}
+
 document.getElementById('loanForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    
-    const amount = parseFloat(document.getElementById('loanAmount').value);
-    const rate = parseFloat(document.getElementById('loanRate').value);
-    const term = parseInt(document.getElementById('loanTerm').value);
+    const isTopUp = document.getElementById('isTopUp').value === 'true';
+    const oldId = document.getElementById('oldLoanId').value;
+    const amt = parseFloat(document.getElementById('loanAmount').value);
+    const rate = document.getElementById('loanRate').value;
+    const term = document.getElementById('loanTerm').value;
+    const freq = document.getElementById('loanFreq').value;
+    const date = document.getElementById('loanDate').value;
     const clientId = document.getElementById('loanClientSelect').value;
-    
-    if(!clientId) return alert("Please select a valid client.");
 
-    // Simple Flat Interest Calculation: Principal + (Principal * Rate%)
-    const totalInterest = amount * (rate / 100);
-    const totalRepayable = amount + totalInterest;
-    
-    const newLoan = {
-        id: Date.now(),
-        clientId: clientId,
-        amount: amount, // Principal
-        totalRepayable: totalRepayable, // Total owed
-        balance: totalRepayable, // Outstanding balance (starts as total)
-        term: term,
-        startDate: document.getElementById('loanDate').value,
-        status: 'Active'
-    };
-    
-    loans.push(newLoan);
-    saveToLocalStorage(); // Auto-save
-    renderLoans();
-    updateDashboard();
-    
-    e.target.reset();
+    let p = amt;
+    if(isTopUp) {
+        const l = loans.find(x => x.id == oldId);
+        p += l.balance;
+        l.balance = 0; l.status = 'Restructured';
+    }
+
+    const { total, schedule } = calculateSchedule(p, rate, term, freq, date);
+    loans.push({
+        id: Date.now(), clientId, principal: p, totalRepayable: total, balance: total, schedule, status: 'Active', frequency: freq, term
+    });
+
+    saveToCloud();
     bootstrap.Modal.getInstance(document.getElementById('newLoanModal')).hide();
 });
 
-// Render Loan Table
-function renderLoans() {
-    const tbody = document.getElementById('loanTableBody');
-    if(loans.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No active loans.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = loans.map(l => {
-        const client = clients.find(c => c.id == l.clientId) || {name: 'Unknown Client'};
-        
-        // Calculate Due Date (Start Date + Term Months)
-        const dueDate = new Date(l.startDate);
-        dueDate.setMonth(dueDate.getMonth() + l.term);
-        
-        // Dynamic Badge
-        let statusBadge = l.balance <= 0 
-            ? '<span class="badge bg-success">Paid</span>' 
-            : '<span class="badge bg-primary">Active</span>';
-            
-        // Pay Button logic
-        let actionBtn = l.balance > 0 
-            ? `<button class="btn btn-sm btn-outline-success fw-bold" onclick="openRepayment(${l.id})">Pay</button>` 
-            : `<span class="text-muted small">Completed</span>`;
-
-        return `
-        <tr>
-            <td>
-                <div class="fw-bold">${client.name}</div>
-                <small class="text-muted">Loan #${l.id.toString().slice(-4)}</small>
-            </td>
-            <td>$${l.totalRepayable.toFixed(2)}</td>
-            <td class="fw-bold text-danger">$${l.balance.toFixed(2)}</td>
-            <td>${dueDate.toLocaleDateString()}</td>
-            <td>${statusBadge}</td>
-            <td>${actionBtn}</td>
-        </tr>
-    `}).join('');
-}
-
-// --- 3. REPAYMENT LOGIC ---
-
-function openRepayment(loanId) {
-    const loan = loans.find(l => l.id == loanId);
-    if(!loan) return;
-
-    document.getElementById('payLoanId').value = loanId;
-    document.getElementById('payCurrentBalance').innerText = `$${loan.balance.toFixed(2)}`;
-    document.getElementById('payAmount').value = ''; 
-    
+// --- PAYMENTS ---
+window.openPay = function(id) {
+    const l = loans.find(x => x.id == id);
+    document.getElementById('payLoanId').value = id;
+    document.getElementById('payBalance').innerText = formatNaira(l.balance);
     new bootstrap.Modal(document.getElementById('repaymentModal')).show();
-}
+};
 
-function processRepayment() {
-    const loanId = document.getElementById('payLoanId').value;
-    const amount = parseFloat(document.getElementById('payAmount').value);
+window.processRepayment = function() {
+    const id = document.getElementById('payLoanId').value;
+    const amt = parseFloat(document.getElementById('payAmount').value);
+    const l = loans.find(x => x.id == id);
     
-    if(!amount || amount <= 0) return alert("Please enter a valid amount.");
-
-    const loan = loans.find(l => l.id == loanId);
-    
-    // Deduct amount
-    loan.balance -= amount;
-    
-    // Handle overpayment or completion
-    if(loan.balance <= 0.01) {
-        loan.balance = 0;
-        loan.status = 'Paid';
+    if(amt > 0) {
+        l.balance -= amt;
+        if(l.balance <= 0) { l.balance = 0; l.status = 'Paid'; }
+        
+        // Auto mark schedule
+        let paid = l.totalRepayable - l.balance;
+        let r = 0;
+        l.schedule.forEach(s => { r+=s.amount; if(r <= paid+100) s.paid = true; });
+        
+        saveToCloud();
+        bootstrap.Modal.getInstance(document.getElementById('repaymentModal')).hide();
     }
+};
 
-    saveToLocalStorage(); // Auto-save
-    renderLoans();
-    updateDashboard();
-    
-    bootstrap.Modal.getInstance(document.getElementById('repaymentModal')).hide();
+// --- EXPENSES ---
+document.getElementById('expenseForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    expenses.push({
+        id: Date.now(),
+        date: document.getElementById('expDate').value,
+        cat: document.getElementById('expCat').value,
+        amount: parseFloat(document.getElementById('expAmount').value),
+        note: document.getElementById('expNote').value
+    });
+    saveToCloud();
+    bootstrap.Modal.getInstance(document.getElementById('expenseModal')).hide();
+});
+
+// --- RENDERERS ---
+function renderClients() {
+    document.getElementById('clientTableBody').innerHTML = clients.map(c => `
+        <tr><td>${c.name}</td><td>${c.phone}</td>
+        <td>${c.isBlacklisted ? '<span class="badge bg-danger">Blacklist</span>' : '<span class="badge bg-success">Active</span>'}</td>
+        <td><button class="btn btn-sm btn-outline-dark" onclick="toggleBlacklist(${c.id})">Toggle</button></td></tr>
+    `).join('');
 }
 
-// --- 4. DASHBOARD & UTILS ---
+function renderLoans() {
+    document.getElementById('loanTableBody').innerHTML = loans.map(l => {
+        const c = clients.find(x => x.id == l.clientId) || {name:'Unknown'};
+        const st = l.status === 'Paid' ? 'bg-success' : (l.status==='Restructured'?'bg-secondary':'bg-primary');
+        return `<tr>
+            <td>${c.name}<br><small>${l.frequency}</small></td>
+            <td><small>${l.term} Inst.</small></td>
+            <td>${formatNaira(l.totalRepayable)}</td>
+            <td class="text-danger fw-bold">${formatNaira(l.balance)}</td>
+            <td><span class="badge ${st}">${l.status}</span></td>
+            <td>${l.balance>0 ? `<div class="btn-group"><button class="btn btn-sm btn-success" onclick="openPay(${l.id})">Pay</button><button class="btn btn-sm btn-warning" onclick="openNewLoanModal(${l.id})">♻</button></div>` : '-'}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderExpenses() {
+    document.getElementById('expenseTableBody').innerHTML = expenses.map(e => `
+        <tr><td>${e.date}</td><td>${e.cat}<br><small>${e.note}</small></td><td>${formatNaira(e.amount)}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteExp(${e.id})">x</button></td></tr>
+    `).join('');
+}
+window.deleteExp = function(id) { expenses = expenses.filter(e => e.id !== id); saveToCloud(); };
 
 function updateDashboard() {
-    const totalLent = loans.reduce((sum, l) => sum + l.amount, 0);
-    const totalOutstanding = loans.reduce((sum, l) => sum + l.balance, 0);
+    const out = loans.filter(l => l.balance > 0).reduce((s,l) => s+l.balance, 0);
+    const exp = expenses.reduce((s,e) => s+e.amount, 0);
+    const gross = loans.reduce((s,l) => s + (l.totalRepayable - l.principal), 0);
     
-    document.getElementById('totalLent').innerText = `$${totalLent.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    document.getElementById('totalOutstanding').innerText = `$${totalOutstanding.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    document.getElementById('totalClients').innerText = clients.length;
-}
-
-function saveToLocalStorage() {
-    localStorage.setItem('lm_clients', JSON.stringify(clients));
-    localStorage.setItem('lm_loans', JSON.stringify(loans));
-}
-
-function clearData() {
-    if(confirm("⚠ ARE YOU SURE?\n\nThis will wipe all data from this browser.\nMake sure you have a Backup File saved first!")) {
-        localStorage.clear();
-        location.reload();
-    }
-}
-
-// --- 5. BACKUP & RESTORE (TXT FILE SYSTEM) ---
-
-// DOWNLOAD: Saves the current database as a .txt file
-function downloadData() {
-    const data = {
-        timestamp: new Date().toISOString(),
-        clients: clients,
-        loans: loans
-    };
+    document.getElementById('dashOutstanding').innerText = formatNaira(out);
+    document.getElementById('dashExpenses').innerText = formatNaira(exp);
+    document.getElementById('dashNetProfit').innerText = formatNaira(gross - exp);
     
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    
-    const fileName = `loan_backup_${new Date().toISOString().slice(0,10)}.txt`;
-    
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", fileName);
-    document.body.appendChild(downloadAnchorNode); 
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-}
-
-// UPLOAD: Reads the .txt file and restores data
-function loadFromFile(inputElement) {
-    const file = inputElement.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    
-    reader.onload = function(event) {
-        try {
-            const data = JSON.parse(event.target.result);
-            
-            // Validation check to ensure it's our file format
-            if(data.clients && data.loans) {
-                if(confirm(`Found backup from ${data.timestamp || 'unknown date'}.\n\nOverwrite current data?`)) {
-                    clients = data.clients;
-                    loans = data.loans;
-                    
-                    saveToLocalStorage();
-                    location.reload();
-                }
-            } else {
-                alert("Error: This file does not look like a valid backup.");
-            }
-        } catch(e) {
-            console.error(e);
-            alert("Error reading file. Please try again.");
+    // PAR > 30 Days
+    const today = new Date();
+    let par = 0;
+    loans.forEach(l => {
+        if(l.balance>0) {
+            const overdue = l.schedule.find(s => !s.paid && (today - new Date(s.date))/(1000*3600*24) > 30);
+            if(overdue) par += l.balance;
         }
-    };
-    
-    reader.readAsText(file);
-    // Reset input so same file can be selected again if needed
-    inputElement.value = '';
+    });
+    document.getElementById('dashPAR').innerText = formatNaira(par);
 }
+
+// Utils
+window.runCalc = function() {
+    const p = parseFloat(document.getElementById('calcP').value);
+    const t = parseFloat(document.getElementById('calcT').value);
+    if(p&&t) {
+        document.getElementById('resProfit').innerText = formatNaira(t-p);
+        document.getElementById('resRate').innerText = (((t-p)/p)*100).toFixed(1)+'%';
+        document.getElementById('calcRes').classList.remove('d-none');
+    }
+};
+
+// Set defaults
+document.getElementById('loanDate').value = new Date().toISOString().split('T')[0];
+document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
