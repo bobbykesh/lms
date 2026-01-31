@@ -3,220 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loan Manager MVP</title>
-    <!-- Bootstrap CSS -->
+    <title>RapidEx LMS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-light">
 
-    <!-- Navbar with Save/Load Actions -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow-sm">
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
         <div class="container">
-            <span class="navbar-brand mb-0 h1 fw-bold">💰 LoanManager MVP</span>
-            
+            <span class="navbar-brand fw-bold text-warning"><i class="fas fa-bolt"></i> RapidEx LMS</span>
             <div class="d-flex align-items-center gap-2">
-                <!-- Hidden input for file upload -->
-                <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" onchange="loadFromFile(this)">
-                
-                <button class="btn btn-outline-light btn-sm" onclick="document.getElementById('fileInput').click()">
-                    📂 Load Backup
-                </button>
-                <button class="btn btn-light btn-sm fw-bold" onclick="downloadData()">
-                    💾 Save Data
-                </button>
-                <button class="btn btn-danger btn-sm" onclick="clearData()">
-                    ⚠ Reset
+                <span id="connectionStatus" class="badge bg-secondary">Connecting...</span>
+                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#calculatorModal">
+                    <i class="fas fa-calculator"></i>
                 </button>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        
-        <!-- Dashboard Summary Cards -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card text-white bg-success mb-3 shadow-sm">
+
+        <!-- DASHBOARD -->
+        <div class="row mb-4 g-3">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white h-100 shadow-sm">
                     <div class="card-body">
-                        <h6 class="card-title text-uppercase opacity-75">Total Lent (Principal)</h6>
-                        <h2 id="totalLent">$0.00</h2>
+                        <h6 class="opacity-75">Active Balance</h6>
+                        <h3 id="dashOutstanding">₦0.00</h3>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card text-white bg-warning mb-3 shadow-sm">
+            <div class="col-md-3">
+                <div class="card bg-success text-white h-100 shadow-sm">
                     <div class="card-body">
-                        <h6 class="card-title text-uppercase opacity-75">Outstanding Balance</h6>
-                        <h2 id="totalOutstanding">$0.00</h2>
+                        <h6 class="opacity-75">Net Profit</h6>
+                        <h3 id="dashNetProfit">₦0.00</h3>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card text-white bg-info mb-3 shadow-sm">
+            <div class="col-md-3">
+                <div class="card bg-danger text-white h-100 shadow-sm">
                     <div class="card-body">
-                        <h6 class="card-title text-uppercase opacity-75">Active Clients</h6>
-                        <h2 id="totalClients">0</h2>
+                        <h6 class="opacity-75">PAR (Risk > 30 Days)</h6>
+                        <h3 id="dashPAR">₦0.00</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-white text-dark h-100 shadow-sm border">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Expenses</h6>
+                            <h3 id="dashExpenses" class="text-danger">₦0.00</h3>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#expenseModal">+ Add Expense</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
+        <!-- TABS -->
         <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active fw-bold" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button">👥 Clients</button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link fw-bold" id="loans-tab" data-bs-toggle="tab" data-bs-target="#loans" type="button">📄 Loans</button>
-            </li>
+            <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#loans">Loans</button></li>
+            <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#clients">Clients</button></li>
+            <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#expenses">Expenses</button></li>
         </ul>
 
-        <div class="tab-content bg-white p-4 border border-top-0 rounded-bottom shadow-sm">
-            
-            <!-- Clients Section -->
-            <div class="tab-pane fade show active" id="clients">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4 class="mb-0">Client List</h4>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">+ Add Client</button>
+        <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom shadow-sm">
+            <!-- LOANS -->
+            <div class="tab-pane fade show active" id="loans">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h5>Active Loans</h5>
+                    <button class="btn btn-warning fw-bold" onclick="openNewLoanModal()">+ New Loan</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Address</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clientTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Loans Section -->
-            <div class="tab-pane fade" id="loans">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4 class="mb-0">Loan Portfolio</h4>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newLoanModal" onclick="loadClientSelect()">+ New Loan</button>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Client</th>
-                                <th>Total Due</th>
-                                <th>Balance</th>
-                                <th>Due Date</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
+                        <thead class="table-light"><tr><th>Client</th><th>Details</th><th>Total Due</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead>
                         <tbody id="loanTableBody"></tbody>
                     </table>
                 </div>
             </div>
+            <!-- CLIENTS -->
+            <div class="tab-pane fade" id="clients">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h5>Clients</h5>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">+ Add Client</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light"><tr><th>Name</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead>
+                        <tbody id="clientTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- EXPENSES -->
+            <div class="tab-pane fade" id="expenses">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead>
+                        <tbody id="expenseTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL 1: Add Client -->
-    <div class="modal fade" id="addClientModal" tabindex="-1">
+    <!-- MODAL: NEW LOAN (Smart) -->
+    <div class="modal fade" id="newLoanModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 id="loanModalTitle">New Loan</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Limit Info -->
+                    <div class="alert alert-light border d-flex justify-content-between align-items-center">
+                        <span>Limit: <strong id="dynamicLimitDisplay">...</strong></span>
+                        <span id="limitMessage" class="badge bg-secondary">Calculating...</span>
+                    </div>
+                    <!-- TopUp Alert -->
+                    <div id="topUpAlert" class="alert alert-info d-none">
+                        <strong>Restructuring:</strong> Previous Balance of <strong id="topUpOldBalance"></strong> will be rolled over.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 border-end">
+                            <form id="loanForm">
+                                <input type="hidden" id="isTopUp" value="false"><input type="hidden" id="oldLoanId" value=""><input type="hidden" id="calculatedLimit" value="0">
+                                
+                                <label>Client</label> <select class="form-select mb-2" id="loanClientSelect" onchange="calculateClientLimit()" required></select>
+                                <label>Amount (₦)</label> <input type="number" class="form-control mb-1" id="loanAmount" oninput="updatePreview()" required>
+                                <div id="amountFeedback" class="text-danger small d-none fw-bold mb-2">Exceeds Limit!</div>
+                                
+                                <div class="row g-2">
+                                    <div class="col-6"><label>Interest (%)</label><input type="number" class="form-control mb-2" id="loanRate" value="15" oninput="updatePreview()" required></div>
+                                    <div class="col-6"><label>Freq</label><select class="form-select mb-2" id="loanFreq" onchange="updatePreview()"><option value="Monthly">Monthly</option><option value="Weekly">Weekly</option></select></div>
+                                </div>
+                                <label>Duration (Count)</label><input type="number" class="form-control mb-1" id="loanTerm" value="1" oninput="updatePreview()" required>
+                                <div id="termFeedback" class="text-danger small d-none fw-bold mb-2"></div>
+                                <label>Date</label><input type="date" class="form-control mb-3" id="loanDate" onchange="updatePreview()" required>
+                                <button type="submit" id="btnIssueLoan" class="btn btn-warning w-100 fw-bold">Issue Loan</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6 bg-light p-3">
+                            <h6 class="text-muted">Schedule</h6>
+                            <div style="max-height:250px; overflow-y:auto;"><table class="table table-sm small"><tbody id="previewBody"></tbody></table></div>
+                            <div class="border-top pt-2">Total Due: <strong class="text-success" id="previewTotal">₦0.00</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD CLIENT -->
+    <div class="modal fade" id="addClientModal">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Client</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header"><h5>Add Client</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="clientForm">
-                        <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="clientName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Phone Number</label>
-                            <input type="tel" class="form-control" id="clientPhone" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Address/ID</label>
-                            <input type="text" class="form-control" id="clientAddress">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Save Client</button>
+                        <input type="text" class="form-control mb-2" id="clientName" placeholder="Name" required>
+                        <input type="tel" class="form-control mb-2" id="clientPhone" placeholder="Phone" required>
+                        <textarea class="form-control mb-2" id="clientAddress" placeholder="Address/ID Details"></textarea>
+                        <button class="btn btn-primary w-100">Save</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL 2: New Loan -->
-    <div class="modal fade" id="newLoanModal" tabindex="-1">
+    <!-- MODAL: REPAYMENT -->
+    <div class="modal fade" id="repaymentModal">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Originate Loan</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header"><h5>Payment</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <form id="loanForm">
-                        <div class="mb-3">
-                            <label class="form-label">Select Client</label>
-                            <select class="form-select" id="loanClientSelect" required></select>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Principal ($)</label>
-                                <input type="number" class="form-control" id="loanAmount" required>
-                            </div>
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Interest (%)</label>
-                                <input type="number" class="form-control" id="loanRate" value="10" required>
-                            </div>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Term (Months)</label>
-                                <input type="number" class="form-control" id="loanTerm" value="1" required>
-                            </div>
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Start Date</label>
-                                <input type="date" class="form-control" id="loanDate" required>
-                            </div>
-                        </div>
-                        <div class="alert alert-secondary p-2 small">
-                            <strong>Note:</strong> Interest is calculated flat upfront.
-                        </div>
-                        <button type="submit" class="btn btn-success w-100">Issue Loan</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL 3: Repayment -->
-    <div class="modal fade" id="repaymentModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Record Repayment</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        Current Outstanding: <strong id="payCurrentBalance">$0.00</strong>
-                    </div>
+                    <p>Balance: <strong id="payBalance"></strong></p>
                     <input type="hidden" id="payLoanId">
-                    <div class="mb-3">
-                        <label class="form-label">Amount Received ($)</label>
-                        <input type="number" class="form-control form-control-lg" id="payAmount" required placeholder="0.00">
-                    </div>
-                    <button onclick="processRepayment()" class="btn btn-primary w-100 btn-lg">Confirm Payment</button>
+                    <input type="number" class="form-control mb-3" id="payAmount" placeholder="Amount (₦)">
+                    <button onclick="processRepayment()" class="btn btn-success w-100">Confirm</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Bundle -->
+    <!-- MODAL: EXPENSE -->
+    <div class="modal fade" id="expenseModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5>Expense</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <form id="expenseForm">
+                        <input type="date" class="form-control mb-2" id="expDate" required>
+                        <select class="form-select mb-2" id="expCat"><option>Data/Airtime</option><option>Transport</option><option>Salary</option><option>Other</option></select>
+                        <input type="number" class="form-control mb-2" id="expAmount" placeholder="Amount" required>
+                        <input type="text" class="form-control mb-2" id="expNote" placeholder="Note">
+                        <button class="btn btn-danger w-100">Log Expense</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CALCULATOR -->
+    <div class="modal fade" id="calculatorModal">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header"><h5>Calc</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="number" id="calcP" class="form-control mb-2" placeholder="Principal">
+                    <input type="number" id="calcT" class="form-control mb-2" placeholder="Total Expected">
+                    <button class="btn btn-dark w-100 mb-2" onclick="runCalc()">Result</button>
+                    <div id="calcRes" class="d-none">Profit: <span id="resProfit"></span> | Rate: <span id="resRate"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE & LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+
+        // YOUR SPECIFIC CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_7lyIB_MNXqvJZUfscnTSRAH-LKfBPew",
+            authDomain: "rapidex-lms.firebaseapp.com",
+            databaseURL: "https://rapidex-lms-default-rtdb.firebaseio.com",
+            projectId: "rapidex-lms",
+            storageBucket: "rapidex-lms.firebasestorage.app",
+            messagingSenderId: "92988249183",
+            appId: "1:92988249183:web:c2c0b8fc298dd386eb77ea",
+            measurementId: "G-EQJWVFCJCR"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Make Firebase available globally for app.js
+        window.db = db;
+        window.dbRef = ref;
+        window.dbSet = set;
+        window.dbOnValue = onValue;
+
+        // Signal app.js to start
+        document.dispatchEvent(new Event('firebase-ready'));
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
